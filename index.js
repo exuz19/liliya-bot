@@ -1,5 +1,7 @@
 console.log("🚀 NEW VERSION RUNNING");
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const OpenAI = require('openai');
