@@ -13,7 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 
 app.get('/', (req, res) => {
-    res.send('Liliya is alive');
+    res.send('Bot alive');
 });
 
 app.listen(PORT, () => {
@@ -29,15 +29,21 @@ const client = new Client({
     ]
 });
 
+// 🔥 FORCE LOG EVERYTHING
+client.on('ready', () => {
+    console.log(`✅ LOGGED IN AS: ${client.user.tag}`);
+});
+
+// 🧪 DEBUG CONNECTION EVENTS
+client.on('debug', console.log);
+client.on('error', console.error);
+
 // OpenAI
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-// Memory
-const memory = {};
-
-// Load commands
+// Commands
 client.commands = new Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
@@ -46,16 +52,7 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-// Debug
-console.log("TOKEN EXISTS:", !!process.env.TOKEN);
-console.log("OPENAI KEY EXISTS:", !!process.env.OPENAI_API_KEY);
-
-// Ready
-client.once('clientReady', () => {
-    console.log(`Logged in as ${client.user.tag}`);
-});
-
-// Slash commands (FIXED)
+// Slash commands
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -65,71 +62,15 @@ client.on('interactionCreate', async interaction => {
     try {
         await interaction.deferReply();
         await command.execute(interaction);
-    } catch (error) {
-        console.error(error);
-
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply("Error occurred");
-        } else {
-            await interaction.reply("Error occurred");
-        }
-    }
-});
-
-// AI Chat
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-
-    const content = message.content.toLowerCase();
-
-    const isTriggered =
-        content.includes('liliya') ||
-        content.includes('lilya') ||
-        message.mentions.has(client.user);
-
-    if (!isTriggered) return;
-
-    const userId = message.author.id;
-
-    if (!memory[userId]) memory[userId] = [];
-
-    memory[userId].push({
-        role: "user",
-        content: message.content
-    });
-
-    if (memory[userId].length > 10) {
-        memory[userId].shift();
-    }
-
-    try {
-        await message.channel.sendTyping();
-
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are Liliya, a playful and confident character. Keep replies short and natural."
-                },
-                ...memory[userId]
-            ]
-        });
-
-        const reply = completion.choices[0].message.content;
-
-        memory[userId].push({
-            role: "assistant",
-            content: reply
-        });
-
-        await message.reply(reply);
-
     } catch (err) {
         console.error(err);
-        message.reply("Something went wrong.");
+        await interaction.editReply("Error");
     }
 });
 
-// Login
-client.login(process.env.TOKEN);
+// Login (CRITICAL DEBUG)
+console.log("TOKEN LENGTH:", process.env.TOKEN?.length);
+
+client.login(process.env.TOKEN)
+    .then(() => console.log("🚀 LOGIN SUCCESS"))
+    .catch(err => console.error("❌ LOGIN FAILED:", err));
