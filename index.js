@@ -1,18 +1,30 @@
-// Load .env locally
+// ================= CRASH VISIBILITY =================
+process.on('unhandledRejection', err => {
+    console.error('❌ UNHANDLED REJECTION:', err);
+});
+
+process.on('uncaughtException', err => {
+    console.error('❌ UNCAUGHT EXCEPTION:', err);
+});
+
+// ================= LOAD ENV =================
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
 
+// ================= IMPORTS =================
 const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
 const fs = require('fs');
 const OpenAI = require('openai');
 const express = require('express');
 
-// ================= EXPRESS =================
+// ================= EXPRESS (RENDER KEEP ALIVE) =================
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.get('/', (req, res) => res.send('Bot alive'));
+app.get('/', (req, res) => {
+    res.send('Bot alive');
+});
 
 app.listen(PORT, () => {
     console.log(`🌐 Web server running on port ${PORT}`);
@@ -41,7 +53,7 @@ client.once('ready', () => {
     console.log(`✅ LOGGED IN AS: ${client.user.tag}`);
 });
 
-// ================= CONNECTION DEBUG =================
+// ================= DEBUG =================
 client.on('shardReady', id => {
     console.log(`🟢 Shard ${id} ready`);
 });
@@ -56,14 +68,19 @@ client.on('shardDisconnect', event => {
 
 // ================= COMMANDS =================
 client.commands = new Collection();
-const commandFiles = fs.readdirSync('./commands').filter(f => f.endsWith('.js'));
 
-for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    client.commands.set(command.data.name, command);
+if (fs.existsSync('./commands')) {
+    const commandFiles = fs.readdirSync('./commands').filter(f => f.endsWith('.js'));
+
+    for (const file of commandFiles) {
+        const command = require(`./commands/${file}`);
+        client.commands.set(command.data.name, command);
+    }
+} else {
+    console.warn("⚠️ No /commands folder found");
 }
 
-// ================= SLASH COMMAND =================
+// ================= SLASH COMMAND HANDLER =================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -72,9 +89,7 @@ client.on('interactionCreate', async interaction => {
 
     try {
         await interaction.deferReply();
-
         await command.execute(interaction);
-
     } catch (err) {
         console.error("❌ COMMAND ERROR:", err);
 
@@ -86,7 +101,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// ================= AI MESSAGE =================
+// ================= AI MESSAGE HANDLER =================
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
@@ -128,9 +143,24 @@ client.on('messageCreate', async message => {
     }
 });
 
-// ================= LOGIN =================
-console.log("🔑 TOKEN LENGTH:", process.env.TOKEN?.length);
+// ================= START BOT (CRITICAL SECTION) =================
+(async () => {
+    try {
+        console.log("🔥 FILE LOADED");
 
-client.login(process.env.TOKEN)
-    .then(() => console.log("🚀 LOGIN SUCCESS"))
-    .catch(err => console.error("❌ LOGIN FAILED:", err));
+        if (!process.env.TOKEN) {
+            console.error("❌ TOKEN missing!");
+            process.exit(1);
+        }
+
+        console.log("🔑 TOKEN LENGTH:", process.env.TOKEN.length);
+        console.log("⏳ Attempting Discord login...");
+
+        await client.login(process.env.TOKEN);
+
+        console.log("🚀 LOGIN SUCCESS (promise resolved)");
+
+    } catch (err) {
+        console.error("❌ LOGIN CRASHED:", err);
+    }
+})();
