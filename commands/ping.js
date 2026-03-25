@@ -3,9 +3,9 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('Check if bot is alive'),
+        .setDescription('Replies with pong!'),
 
     async execute(interaction) {
-        await interaction.reply("I am always watching.");
+        await interaction.editReply('🏓 Pong!');
     },
 };
