@@ -13,18 +13,16 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ================= IMPORTS =================
-const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const OpenAI = require('openai');
 const express = require('express');
 
-// ================= EXPRESS (RENDER KEEP ALIVE) =================
+// ================= EXPRESS (REQUIRED FOR FREE RENDER) =================
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.get('/', (req, res) => {
-    res.send('Bot alive');
-});
+app.get('/', (req, res) => res.send('Bot alive'));
 
 app.listen(PORT, () => {
     console.log(`🌐 Web server running on port ${PORT}`);
@@ -36,8 +34,7 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
-    ],
-    partials: [Partials.Channel]
+    ]
 });
 
 // ================= OPENAI =================
@@ -49,22 +46,25 @@ const openai = new OpenAI({
 const userMemory = new Map();
 
 // ================= READY =================
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`✅ LOGGED IN AS: ${client.user.tag}`);
 });
 
-// ================= DEBUG =================
-client.on('shardReady', id => {
-    console.log(`🟢 Shard ${id} ready`);
-});
+// ================= AUTO RECONNECT =================
+async function startBot() {
+    try {
+        console.log("🔑 TOKEN LENGTH:", process.env.TOKEN?.length);
+        console.log("⏳ Attempting Discord login...");
 
-client.on('shardError', error => {
-    console.error('🔴 Shard error:', error);
-});
+        await client.login(process.env.TOKEN);
 
-client.on('shardDisconnect', event => {
-    console.warn('⚠️ Shard disconnected:', event.code);
-});
+        console.log("🚀 LOGIN SUCCESS");
+
+    } catch (err) {
+        console.error("❌ LOGIN FAILED, retrying in 5s...", err);
+        setTimeout(startBot, 5000); // retry
+    }
+}
 
 // ================= COMMANDS =================
 client.commands = new Collection();
@@ -76,11 +76,9 @@ if (fs.existsSync('./commands')) {
         const command = require(`./commands/${file}`);
         client.commands.set(command.data.name, command);
     }
-} else {
-    console.warn("⚠️ No /commands folder found");
 }
 
-// ================= SLASH COMMAND HANDLER =================
+// ================= SLASH COMMAND =================
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -101,7 +99,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// ================= AI MESSAGE HANDLER =================
+// ================= AI MESSAGE =================
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
 
@@ -143,24 +141,6 @@ client.on('messageCreate', async message => {
     }
 });
 
-// ================= START BOT (CRITICAL SECTION) =================
-(async () => {
-    try {
-        console.log("🔥 FILE LOADED");
-
-        if (!process.env.TOKEN) {
-            console.error("❌ TOKEN missing!");
-            process.exit(1);
-        }
-
-        console.log("🔑 TOKEN LENGTH:", process.env.TOKEN.length);
-        console.log("⏳ Attempting Discord login...");
-
-        await client.login(process.env.TOKEN);
-
-        console.log("🚀 LOGIN SUCCESS (promise resolved)");
-
-    } catch (err) {
-        console.error("❌ LOGIN CRASHED:", err);
-    }
-})();
+// ================= START =================
+console.log("🔥 FILE LOADED");
+startBot();
