@@ -1,4 +1,4 @@
-// ✅ Load env only locally (NOT in Render)
+// ✅ Load .env ONLY locally (Render uses its own env system)
 if (process.env.NODE_ENV !== 'production') {
     require('dotenv').config();
 }
@@ -34,7 +34,7 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY
 });
 
-// 🧾 Memory (per user)
+// 🧾 Memory
 const memory = {};
 
 // 📦 Load commands
@@ -45,6 +45,10 @@ for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     client.commands.set(command.data.name, command);
 }
+
+// 🔍 DEBUG ENV (IMPORTANT)
+console.log("TOKEN EXISTS:", !!process.env.TOKEN);
+console.log("OPENAI KEY EXISTS:", !!process.env.OPENAI_API_KEY);
 
 // 🔥 Ready
 client.once('clientReady', () => {
@@ -66,7 +70,7 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// 💬 AI Chat System
+// 💬 AI Chat
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -126,10 +130,12 @@ Never say you're an AI.
         await message.reply(reply);
 
     } catch (err) {
-        console.error(err);
+        console.error("AI ERROR:", err);
         message.reply("Hmm… even flames flicker sometimes.");
     }
 });
 
-// 🔐 LOGIN (FIXED — NO SYNTAX ERROR)
-client.login(process.env.TOKEN);
+// 🔐 LOGIN WITH ERROR HANDLING
+client.login(process.env.TOKEN).catch(err => {
+    console.error("LOGIN ERROR:", err);
+});
